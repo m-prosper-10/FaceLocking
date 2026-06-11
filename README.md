@@ -2,7 +2,7 @@
 
 <img src="https://via.placeholder.com/800x200/007bff/ffffff?text=ArcFace+ONNX+%2B+5-Point+Alignment" alt="Project Banner" width="800"/>
 
-**Author:** Andrew Byukusenge  
+**Author:** Mugisha Prosper  
 **Instructor:** Gabriel Baziramwabo  
 **Organization:** Rwanda Coding Academy  
 
@@ -75,6 +75,16 @@ cd backend && npm install
 ```
 
 ### 2. Enroll Your Face
+If `models/embedder_arcface.onnx` is missing, download the recommended
+InsightFace ArcFace recognition model first:
+
+```bash
+python scripts/download_arcface_model.py
+```
+
+The default is `antelopev2` from the official InsightFace `v0.7` model-package
+release, extracting `glintr100.onnx` to `models/embedder_arcface.onnx`.
+
 ```bash
 python -m src.enroll --name andrew
 ```

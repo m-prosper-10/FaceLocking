@@ -1,6 +1,7 @@
-mediapipe         
-numpy            
+mediapipe==0.10.21
+numpy<2
 onnxruntime       
-opencv-python      
+opencv-contrib-python==4.11.0.86
+paho-mqtt
 scipy             
 tqdm               

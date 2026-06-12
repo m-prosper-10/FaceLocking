@@ -262,9 +262,8 @@
                         return;
                     }
 
-                    // Handle MQTT Movement messages
-                    // Expected: { "status": "MOVE_LEFT", "confidence": 0.9, "timestamp": ... }
-                    if (data.status) {
+                    // Handle MQTT control messages
+                    if (data.command) {
                         updateDashboard(data);
                     }
                 } catch (e) {
@@ -279,10 +278,10 @@
         const noFaceMsgEl = document.getElementById('no-face-msg');
 
         function updateDashboard(data) {
-            statusEl.textContent = data.status;
+            statusEl.textContent = data.command;
 
             // Update Target Info
-            if (data.target) targetEl.textContent = `Target: ${data.target}`;
+            if (data.speaker_id) targetEl.textContent = `Target: ${data.speaker_id}`;
 
             // Update Face Image - only update if new image received
             if (data.face_image) {
@@ -311,11 +310,11 @@
             }
 
             // Visual feedback based on status
-            if (data.status === 'MOVE_LEFT') {
+            if (data.command === 'LEFT') {
                 statusEl.style.color = '#ff0055'; // Red
-            } else if (data.status === 'MOVE_RIGHT') {
+            } else if (data.command === 'RIGHT') {
                 statusEl.style.color = '#00d4ff'; // Blue
-            } else if (data.status === 'CENTERED') {
+            } else if (data.command === 'STOP') {
                 statusEl.style.color = '#00ff9d'; // Green
             } else {
                 statusEl.style.color = '#888';

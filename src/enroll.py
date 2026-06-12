@@ -27,12 +27,11 @@ import time
 import argparse
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 import cv2
 import numpy as np
 from .haar_5pt import Haar5ptDetector, align_face_5pt
 from .embed import ArcFaceEmbedderONNX
-from .camera_utils import open_camera
 
 
 # -------------------------
@@ -219,7 +218,8 @@ def main():
     auto = False
     last_auto = 0.0
 
-    cap = cv2.VideoCapture(0)
+    camera_index = args.camera_index if args.camera_index is not None else 0
+    cap = cv2.VideoCapture(camera_index)
     if not cap.isOpened():
         raise RuntimeError("Failed to open camera.")
 

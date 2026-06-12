@@ -74,6 +74,20 @@ pip install -r requirements.txt
 cd backend && npm install
 ```
 
+To verify Python, backend, model, Mosquitto, and Arduino tool/library
+availability from one command:
+
+```bash
+python scripts/check_dependencies.py
+```
+
+To install the common system dependencies, Python packages, backend packages,
+Arduino support, and the ArcFace model in one pass:
+
+```bash
+bash scripts/install_dependencies.sh
+```
+
 ### 2. Enroll Your Face
 If `models/embedder_arcface.onnx` is missing, download the recommended
 InsightFace ArcFace recognition model first:

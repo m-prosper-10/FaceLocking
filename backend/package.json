@@ -4,7 +4,7 @@
   "description": "Backend for Distributed Vision Control System",
   "main": "server.js",
   "scripts": {
-    "dev": "node server.js"
+    "dev": "node init && node server.js"
   },
   "dependencies": {
     "mqtt": "^4.0.0",

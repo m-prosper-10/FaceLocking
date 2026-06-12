@@ -20,7 +20,6 @@ Since embeddings are L2-normalized, cosine_similarity = dot(a,b).
 
 from __future__ import annotations
 import time
-import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple

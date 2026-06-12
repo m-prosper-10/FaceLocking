@@ -3,8 +3,8 @@
 #include <Servo.h>
 
 // --- Configuration ---
-const char* ssid = "Main Hall";
-const char* password = "Meeting@2024";
+const char* ssid = "big dealer";
+const char* password = "simbizi1.2";
 
 const char* mqtt_server = "157.173.101.159"; 
 const int mqtt_port = 1883;

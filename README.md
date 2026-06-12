@@ -89,29 +89,41 @@ release, extracting `glintr100.onnx` to `models/embedder_arcface.onnx`.
 python -m src.enroll --name andrew
 ```
 
-### 3. Start the System
+### 3. Run the System
 
-**On VPS (or local MQTT broker):**
-```bash
-mosquitto -c mosquitto.conf
-```
+Follow this order so the components connect cleanly:
 
-**On PC - Terminal 1 (Backend):**
-```bash
-cd backend
-npm start
-```
+1. **Start the MQTT broker**
+   - On the VPS or the machine running Mosquitto:
+   ```bash
+   mosquitto -c mosquitto.conf
+   ```
 
-**On PC - Terminal 2 (Vision Node):**
-```bash
-python src/vision_node.py --broker 157.173.101.159 --name andrew
-```
+2. **Start the Node backend**
+   - In a second terminal on the backend machine:
+   ```bash
+   cd backend
+   npm run dev
+   ```
+   - This starts the MQTT-to-WebSocket relay and serves the dashboard page.
 
-### 4. Flash ESP8266
-Upload `esp8266/vision_servo/vision_servo.ino` using Arduino IDE.
+3. **Flash the ESP8266 firmware**
+   - Open `esp8266/vision_servo/vision_servo.ino` in Arduino IDE.
+   - Select the correct board and serial port.
+   - Update the Wi-Fi SSID/password and MQTT broker IP in the sketch if needed.
+   - Upload the sketch to the ESP8266.
+   - You can flash it before or after the other services, but it must be able to reach the broker once powered.
 
-### 5. Access Dashboard
-Open: [http://157.173.101.159:9313]([http://157.173.101.159:9313/])
+4. **Start the PC vision node**
+   - In the project root:
+   ```bash
+   python src/vision_node.py --broker 157.173.101.159 --name andrew
+   ```
+   - Replace `andrew` with the enrolled identity you want to track.
+
+5. **Open the dashboard**
+   - In a browser, open:
+   - `http://157.173.101.159:8080/`
 
 ## Assessment Details (Week 06)
 
@@ -127,7 +139,7 @@ This project implements a **Distributed Face Recognition and Locking System** us
 -   `vision/team313/heartbeat`: System health status.
 
 ### Live Dashboard
-**URL**: [http://157.173.101.159:9313/]
+**URL**: [http://157.173.101.159:8080/]
 
 ## Face Locking
 The new Face Locking feature (`src/face_locking.py` and `vision_node.py`) allows you to track a single enrolled identity continuously.

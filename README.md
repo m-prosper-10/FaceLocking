@@ -19,20 +19,13 @@ The system is designed for **embedded systems applications**, demonstrating how 
 ## Table of Contents
 
 - [Assessment Details (Week 06)](#assessment-details-week-06)
-- [System Architecture](#system-architecture)
 - [Features](#features)
 - [Project Structure](#project-structure)
 - [Quick Start](#quick-start)
-- [Usage](#usage)
 
 ## System Architecture
 
-This distributed system consists of four main components:
-
-1. **Vision Node (PC)**: Detects, recognizes, and tracks faces using ArcFace and MediaPipe. Publishes movement commands via MQTT.
-2. **MQTT Broker (VPS)**: Central message broker facilitating communication between all components.
-3. **ESP8266 (Edge Controller)**: Subscribes to movement commands and controls a servo motor to physically track the detected face.
-4. **Web Dashboard**: Real-time visualization of system status, tracking data, and lock status.
+Detailed architecture, deployment topology, data flow, and sequence diagrams are documented in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Features
 
@@ -103,29 +96,41 @@ release, extracting `glintr100.onnx` to `models/embedder_arcface.onnx`.
 python -m src.enroll --name andrew
 ```
 
-### 3. Start the System
+### 3. Run the System
 
-**On VPS (or local MQTT broker):**
-```bash
-mosquitto -c mosquitto.conf
-```
+Follow this order so the components connect cleanly:
 
-**On PC - Terminal 1 (Backend):**
-```bash
-cd backend
-npm start
-```
+1. **Start the MQTT broker**
+   - On the VPS or the machine running Mosquitto:
+   ```bash
+   mosquitto -c mosquitto.conf
+   ```
 
-**On PC - Terminal 2 (Vision Node):**
-```bash
-python src/vision_node.py --broker 157.173.101.159 --name andrew
-```
+2. **Start the Node backend**
+   - In a second terminal on the backend machine:
+   ```bash
+   cd backend
+   npm run dev
+   ```
+   - This starts the MQTT-to-WebSocket relay and serves the dashboard page.
 
-### 4. Flash ESP8266
-Upload `esp8266/vision_servo/vision_servo.ino` using Arduino IDE.
+3. **Flash the ESP8266 firmware**
+   - Open `esp8266/vision_servo/vision_servo.ino` in Arduino IDE.
+   - Select the correct board and serial port.
+   - Update the Wi-Fi SSID/password and MQTT broker IP in the sketch if needed.
+   - Upload the sketch to the ESP8266.
+   - You can flash it before or after the other services, but it must be able to reach the broker once powered.
 
-### 5. Access Dashboard
-Open: [http://157.173.101.159:9313]([http://157.173.101.159:9313/])
+4. **Start the PC vision node**
+   - In the project root:
+   ```bash
+   python src/vision_node.py --broker 157.173.101.159 --name andrew
+   ```
+   - Replace `andrew` with the enrolled identity you want to track.
+
+5. **Open the dashboard**
+   - In a browser, open:
+   - `http://157.173.101.159:8080/`
 
 ## Assessment Details (Week 06)
 
@@ -140,7 +145,7 @@ This project implements a **Distributed Face Recognition and Locking System** us
 -   `benax/camera/control`: JSON payload with `command` (`LEFT`, `RIGHT`, `STOP`, `SCAN`, `OUT_OF_FRAME`), `speaker_id`, `confidence`, `face_distance`, and `locked` state.
 
 ### Live Dashboard
-**URL**: [http://157.173.101.159:9313/]
+**URL**: [http://157.173.101.159:8080/]
 
 ## Face Locking
 The new Face Locking feature (`src/face_locking.py` and `vision_node.py`) allows you to track a single enrolled identity continuously.

@@ -219,7 +219,9 @@ def main():
     auto = False
     last_auto = 0.0
 
-    cap, camera_index = open_camera(args.camera_index)
+    cap = cv2.VideoCapture(0)
+    if not cap.isOpened():
+        raise RuntimeError("Failed to open camera.")
 
     cv2.namedWindow(cfg.window_main, cv2.WINDOW_NORMAL)
     cv2.namedWindow(cfg.window_aligned, cv2.WINDOW_NORMAL)

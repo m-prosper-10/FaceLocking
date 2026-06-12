@@ -34,7 +34,7 @@ except ImportError:
     from face_locking import FaceLockSystem
 
 # Configuration
-DEFAULT_BROKER = "localhost" 
+DEFAULT_BROKER = "[IP_ADDRESS]" 
 PORT = 1883
 TEAM_ID = "team313"
 TOPIC_CONTROL = "benax/camera/control"
@@ -136,7 +136,9 @@ class VisionNode:
             )
 
     def run(self):
-        cap, camera_index = open_camera(self.camera_index)
+        cap = cv2.VideoCapture(0) # Use default camera
+        if not cap.isOpened():
+             cap = cv2.VideoCapture(0)
         
         print(f"Vision Node Started. Tracking target: {self.system.target_name}")
         print(f"Using camera index: {camera_index}")

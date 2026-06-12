@@ -32,6 +32,7 @@ import cv2
 import numpy as np
 from .haar_5pt import Haar5ptDetector, align_face_5pt
 from .embed import ArcFaceEmbedderONNX
+from .camera_utils import open_camera
 
 
 # -------------------------
@@ -171,6 +172,12 @@ def draw_status(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--name", type=str, help="Person name to enroll")
+    parser.add_argument(
+        "--camera-index",
+        type=int,
+        default=None,
+        help="Preferred camera index. Falls back to 0,1,2 if not available.",
+    )
     args = parser.parse_args()
 
     cfg = EnrollConfig()
@@ -212,15 +219,14 @@ def main():
     auto = False
     last_auto = 0.0
 
-    cap = cv2.VideoCapture(1)
-    if not cap.isOpened():
-        raise RuntimeError("Failed to open camera.")
+    cap, camera_index = open_camera(args.camera_index)
 
     cv2.namedWindow(cfg.window_main, cv2.WINDOW_NORMAL)
     cv2.namedWindow(cfg.window_aligned, cv2.WINDOW_NORMAL)
     cv2.resizeWindow(cfg.window_aligned, 240, 240)
 
     print("\nEnrollment started.")
+    print(f"Using camera index: {camera_index}")
     if base_samples:
         print(
             f"Re-enroll mode: found {len(base_samples)} existing samples in {person_dir}/"

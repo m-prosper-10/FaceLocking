@@ -1,14 +1,12 @@
 # src/camera.py
 import cv2
+from .camera_utils import open_camera
 
 
 def main():
-    cap = cv2.VideoCapture(1)
+    cap, camera_index = open_camera()
 
-    if not cap.isOpened():
-        raise RuntimeError("Camera not opened. Try changing index (0/1/2).")
-
-    print("Camera test. Press 'q' to quit.")
+    print(f"Camera test using index {camera_index}. Press 'q' to quit.")
 
     while True:
         ok, frame = cap.read()

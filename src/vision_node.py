@@ -17,19 +17,28 @@ import sys
 import base64
 
 # Add src to path if needed
-sys.path.append(str(Path(__file__).parent.parent))
+ROOT = Path(__file__).parent.parent
+if str(ROOT) not in sys.path:
+    sys.path.append(str(ROOT))
 
 # Import Face Locking modules
-from src.haar_5pt import Haar5ptDetector
-from src.recognize import ArcFaceEmbedderONNX, FaceDBMatcher, load_db_npz
-from src.face_locking import FaceLockSystem
+try:
+    from src.camera_utils import open_camera
+    from src.haar_5pt import Haar5ptDetector
+    from src.recognize import ArcFaceEmbedderONNX, FaceDBMatcher, load_db_npz
+    from src.face_locking import FaceLockSystem
+except ImportError:
+    from camera_utils import open_camera
+    from haar_5pt import Haar5ptDetector
+    from recognize import ArcFaceEmbedderONNX, FaceDBMatcher, load_db_npz
+    from face_locking import FaceLockSystem
 
 # Configuration
 DEFAULT_BROKER = "localhost" 
 PORT = 1883
 TEAM_ID = "team313"
 TOPIC_CONTROL = "benax/camera/control"
-LOG_PATH = Path(__file__).parent.parent / "logs" / "tracking_log.csv"
+LOG_PATH = ROOT / "logs" / "tracking_log.csv"
 
 
 def ensure_log_file() -> None:
@@ -49,7 +58,7 @@ def distance_to_confidence(distance: float, threshold: float) -> float:
     return min(confidence, 1.0)
 
 class VisionNode:
-    def __init__(self, broker, port, target_name):
+    def __init__(self, broker, port, target_name, camera_index=None):
         # MQTT Setup
         self.client = mqtt.Client(client_id=f"{TEAM_ID}_vision_node")
         self.client.on_connect = self.on_connect
@@ -79,6 +88,7 @@ class VisionNode:
         self.mqtt_topic = TOPIC_CONTROL
         self.snapshot_sent = False  # Track if we've sent the face snapshot
         self.track_threshold = self.matcher.dist_thresh
+        self.camera_index = camera_index
         ensure_log_file()
 
     def on_connect(self, client, userdata, flags, rc):
@@ -126,11 +136,10 @@ class VisionNode:
             )
 
     def run(self):
-        cap = cv2.VideoCapture(1) # Use default camera
-        if not cap.isOpened():
-             cap = cv2.VideoCapture(1)
+        cap, camera_index = open_camera(self.camera_index)
         
         print(f"Vision Node Started. Tracking target: {self.system.target_name}")
+        print(f"Using camera index: {camera_index}")
         print(f"Publishing to {TOPIC_CONTROL}")
         
         while self.running:
@@ -217,7 +226,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--broker", type=str, default=DEFAULT_BROKER, help="MQTT Broker Address")
     parser.add_argument("--name", type=str, default="andrew", help="Target name to lock onto")
+    parser.add_argument(
+        "--camera-index",
+        type=int,
+        default=None,
+        help="Preferred camera index. Falls back to 0,1,2 if not available.",
+    )
     args = parser.parse_args()
 
-    node = VisionNode(args.broker, PORT, args.name)
+    node = VisionNode(args.broker, PORT, args.name, camera_index=args.camera_index)
     node.run()

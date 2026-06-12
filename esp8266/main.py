@@ -7,8 +7,7 @@ import ujson
 # VPS IP for MQTT Broker
 MQTT_BROKER = "10.12.73.80"  # Local PC IP for testing
 CLIENT_ID = "esp8266_team313"
-TOPIC_SUB = b"vision/team313/movement"
-TOPIC_PUB = b"vision/team313/heartbeat"
+TOPIC_SUB = b"benax/camera/control"
 
 # Servo Configuration
 # SG90 Servo: 50Hz PWM. Duty cycle usually 40-115 for 0-180 degrees.
@@ -41,21 +40,23 @@ def sub_cb(topic, msg):
     
     try:
         data = ujson.loads(msg)
-        status = data.get("status", "")
+        command = data.get("command", "")
         
         step = 5 # Move 5 units per command
         
-        if status == "MOVE_LEFT":
+        if command == "LEFT":
             # If camera needs to move left, servo moves... direction depends on mounting.
             # Assuming increasing duty moves left.
             set_servo(current_duty + step)
-        elif status == "MOVE_RIGHT":
+        elif command == "RIGHT":
             set_servo(current_duty - step)
-        elif status == "CENTERED":
+        elif command == "STOP":
             # Do nothing? Or strict center? 
             # Assignment says "camera rotates based on face movement".
             # Usually we just hold position if centered.
             pass
+        elif command == "OUT_OF_FRAME":
+            set_servo(CENTER_DUTY)
             
     except Exception as e:
         print("Error parsing JSON:", e)
@@ -74,19 +75,9 @@ def main():
         client.subscribe(TOPIC_SUB)
         print("Subscribed to:", TOPIC_SUB)
         
-        last_heartbeat = 0
-        
         while True:
             # Check for messages
             client.check_msg()
-            
-            # Heartbeat every 10s
-            now = time.time()
-            if now - last_heartbeat > 10:
-                payload = ujson.dumps({"node": "esp8266", "status": "ONLINE", "uptime": now})
-                client.publish(TOPIC_PUB, payload)
-                last_heartbeat = now
-                
             time.sleep(0.1)
             
     except Exception as e:

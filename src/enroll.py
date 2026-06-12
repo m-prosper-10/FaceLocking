@@ -32,6 +32,7 @@ import cv2
 import numpy as np
 from .haar_5pt import Haar5ptDetector, align_face_5pt
 from .embed import ArcFaceEmbedderONNX
+from .camera_utils import open_camera
 
 
 # -------------------------
@@ -171,6 +172,12 @@ def draw_status(
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--name", type=str, help="Person name to enroll")
+    parser.add_argument(
+        "--camera-index",
+        type=int,
+        default=None,
+        help="Preferred camera index. Falls back to 0,1,2 if not available.",
+    )
     args = parser.parse_args()
 
     cfg = EnrollConfig()
@@ -221,6 +228,7 @@ def main():
     cv2.resizeWindow(cfg.window_aligned, 240, 240)
 
     print("\nEnrollment started.")
+    print(f"Using camera index: {camera_index}")
     if base_samples:
         print(
             f"Re-enroll mode: found {len(base_samples)} existing samples in {person_dir}/"
@@ -240,10 +248,10 @@ def main():
                 break
 
             vis = frame.copy()
-            faces = det.detect(frame, max_faces=1)
+            faces, _ = det.detect_with_mesh(frame, max_faces=5)
             aligned: Optional[np.ndarray] = None
 
-            if faces:
+            if len(faces) == 1:
                 f = faces[0]
                 cv2.rectangle(vis, (f.x1, f.y1), (f.x2, f.y2), (0, 255, 0), 2)
                 for x, y in f.kps.astype(int):
@@ -252,6 +260,17 @@ def main():
                 cv2.imshow(cfg.window_aligned, aligned)
             else:
                 cv2.imshow(cfg.window_aligned, np.zeros((112, 112, 3), dtype=np.uint8))
+                if len(faces) > 1:
+                    cv2.putText(
+                        vis,
+                        "Exactly one face must be visible",
+                        (10, vis.shape[0] - 40),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        0.7,
+                        (0, 0, 255),
+                        2,
+                        cv2.LINE_AA,
+                    )
 
             now = time.time()
             if (
@@ -309,7 +328,10 @@ def main():
                 status_msg = "NEW samples reset (existing kept)."
             if key == ord(" "):
                 if aligned is None:
-                    status_msg = "No face detected. Not captured."
+                    if len(faces) > 1:
+                        status_msg = "Capture rejected. Ensure exactly one face is visible."
+                    else:
+                        status_msg = "No face detected. Not captured."
                 else:
                     r = emb.embed(aligned)
                     new_samples.append(r.embedding)

@@ -67,12 +67,26 @@ pip install -r requirements.txt
 cd backend && npm install
 ```
 
+To verify Python, backend, model, Mosquitto, and Arduino tool/library
+availability from one command:
+
+```bash
+python scripts/check_dependencies.py
+```
+
+To install the common system dependencies, Python packages, backend packages,
+Arduino support, and the ArcFace model in one pass:
+
+```bash
+bash scripts/install_dependencies.sh
+```
+
 ### 2. Enroll Your Face
 If `models/embedder_arcface.onnx` is missing, download the recommended
 InsightFace ArcFace recognition model first:
 
 ```bash
-python scripts/download_arcface_model.py
+python scripts download_arcface_model.py
 ```
 
 The default is `antelopev2` from the official InsightFace `v0.7` model-package
@@ -128,8 +142,7 @@ This project implements a **Distributed Face Recognition and Locking System** us
 4.  **Web Dashboard**: Visualizes the real-time blocking status and tracking info.
 
 ### MQTT Topics
--   `vision/team313/movement`: JSON payload with `status` (MOVE_LEFT, MOVE_RIGHT, CENTERED), `target`, and `locked` state.
--   `vision/team313/heartbeat`: System health status.
+-   `benax/camera/control`: JSON payload with `command` (`LEFT`, `RIGHT`, `STOP`, `SCAN`, `OUT_OF_FRAME`), `speaker_id`, `confidence`, `face_distance`, and `locked` state.
 
 ### Live Dashboard
 **URL**: [http://157.173.101.159:8080/]
@@ -146,4 +159,5 @@ The new Face Locking feature (`src/face_locking.py` and `vision_node.py`) allows
     - **Movement**: Using nose position (Left/Right).
 
 **History**:
-A file named `<name>_history_<timestamp>.txt` is created to record all detected actions.
+- `logs/tracking_log.csv` records `timestamp,speaker_id,confidence,face_distance,command`.
+- A file named `<name>_history_<timestamp>.txt` records lock and action history.

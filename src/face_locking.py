@@ -32,6 +32,13 @@ class FaceAction:
     action_type: str
     details: str
 
+
+@dataclass
+class TargetMatch:
+    face: object
+    similarity: float
+    distance: float
+
 class FaceActionDetector:
     def __init__(self):
         # MediaPipe Landmark Indices
@@ -160,7 +167,9 @@ class FaceLockSystem:
             f.write(line)
         print(f">> ACTION: {atype} ({details})")
 
-    def process_frame(self, frame: np.ndarray, embedder: ArcFaceEmbedderONNX) -> Tuple[np.ndarray, Optional[object]]:
+    def process_frame(
+        self, frame: np.ndarray, embedder: ArcFaceEmbedderONNX
+    ) -> Tuple[np.ndarray, Optional[TargetMatch]]:
         vis = frame.copy()
         H, W = vis.shape[:2]
 
@@ -168,7 +177,7 @@ class FaceLockSystem:
 
         # 1. Process all faces to find matches
         # We want to identify everyone, but only "lock" on the target.
-        target_face = None
+        target_match: Optional[TargetMatch] = None
         target_sim = 0.0
 
         for f in faces:
@@ -187,7 +196,11 @@ class FaceLockSystem:
                     # Keep track of the best target candidate
                     if mr.similarity > target_sim:
                         target_sim = mr.similarity
-                        target_face = f
+                        target_match = TargetMatch(
+                            face=f,
+                            similarity=mr.similarity,
+                            distance=mr.distance,
+                        )
                 else:
                     # Just label other known people immediately
                     cv2.rectangle(vis, (f.x1, f.y1), (f.x2, f.y2), (255, 200, 0), 2) # Cyan/Gold
@@ -215,7 +228,7 @@ class FaceLockSystem:
                 2
             )
 
-            if target_face is not None:
+            if target_match is not None:
                 self.state = LockState.LOCKED
                 self.lost_frames = 0
                 self.log_action("LOCK_ACQUIRED", f"sim={target_sim:.2f}")
@@ -225,9 +238,9 @@ class FaceLockSystem:
         # Let's handle it now (or next frame). The original code used elif, so it waited.
         # Let's use 'if' so we immediately start tracking if found.
         if self.state == LockState.LOCKED:
-            if target_face is not None:
+            if target_match is not None:
                 self.lost_frames = 0
-                f = target_face
+                f = target_match.face
                 
                 # Highlight Target
                 cv2.rectangle(vis, (f.x1, f.y1), (f.x2, f.y2), (0, 255, 0), 3)
@@ -295,7 +308,7 @@ class FaceLockSystem:
                     self.state = LockState.SEARCHING
                     self.log_action("LOCK_LOST", "Target disappeared")
 
-        return vis, target_face
+        return vis, target_match
 
 
 def main():

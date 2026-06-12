@@ -8,8 +8,7 @@ const path = require('path');
 // On VPS, we connect to local mosquitto. On PC, we might want to connect to VPS IP?
 // For Backend (running on VPS), it should connect to localhost (its own mosquitto).
 const MQTT_BROKER = 'mqtt://157.173.101.159';
-const TEAM_ID = 'team313';
-const MQTT_TOPIC_VS = `vision/${TEAM_ID}/movement`;
+const MQTT_TOPIC_CONTROL = 'benax/camera/control';
 const WS_PORT = 9002;
 const HTTP_PORT = 8080; // Port for Dashboard HTML
 
@@ -19,9 +18,9 @@ const mqttClient = mqtt.connect(MQTT_BROKER);
 
 mqttClient.on('connect', () => {
     console.log(`Connected to MQTT Broker.`);
-    mqttClient.subscribe(MQTT_TOPIC_VS, (err) => {
+    mqttClient.subscribe(MQTT_TOPIC_CONTROL, (err) => {
         if (!err) {
-            console.log(`Subscribed to topic: ${MQTT_TOPIC_VS}`);
+            console.log(`Subscribed to topic: ${MQTT_TOPIC_CONTROL}`);
         } else {
             console.error('MQTT Subscription Error:', err);
         }

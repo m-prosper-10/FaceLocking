@@ -3,14 +3,13 @@
 #include <Servo.h>
 
 // --- Configuration ---
-const char* ssid = "big dealer";
-const char* password = "simbizi1.2";
+const char* ssid = "EdNet";
+const char* password = "Huawei@123";
 
 const char* mqtt_server = "157.173.101.159"; 
 const int mqtt_port = 1883;
 const char* client_id = "esp8266_team313";
-const char* topic_movement = "vision/team313/movement";
-const char* topic_heartbeat = "vision/team313/heartbeat";
+const char* topic_movement = "benax/camera/control";
 
 // Servo Configuration
 Servo myServo;
@@ -111,6 +110,11 @@ void callback(char* topic, byte* payload, unsigned int length) {
   } 
   else if (message.indexOf("NO_FACE") >= 0) {
     setSearchMode(true);  // Explicit command to start searching
+  }
+  else if (message.indexOf("OUT_OF_FRAME") >= 0) {
+    isSearching = false;
+    currentAngle = 90;
+    myServo.write(currentAngle);
   }
 }
 

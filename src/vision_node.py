@@ -2,13 +2,14 @@
 vision_node.py
 Simulated Vision Node for Distributed Vision-Control System.
 Tracks face and publishes movement commands via MQTT.
-Topic: vision/team313/movement
+Topic: benax/camera/control
 """
 
 import time
 import argparse
 import cv2
 import json
+import csv
 import numpy as np
 import paho.mqtt.client as mqtt
 from pathlib import Path
@@ -27,8 +28,25 @@ from src.face_locking import FaceLockSystem
 DEFAULT_BROKER = "localhost" 
 PORT = 1883
 TEAM_ID = "team313"
-TOPIC_MOVEMENT = f"vision/{TEAM_ID}/movement"
-TOPIC_HEARTBEAT = f"vision/{TEAM_ID}/heartbeat"
+TOPIC_CONTROL = "benax/camera/control"
+LOG_PATH = Path(__file__).parent.parent / "logs" / "tracking_log.csv"
+
+
+def ensure_log_file() -> None:
+    LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    if LOG_PATH.exists():
+        return
+
+    with open(LOG_PATH, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            ["timestamp", "speaker_id", "confidence", "face_distance", "command"]
+        )
+
+
+def distance_to_confidence(distance: float, threshold: float) -> float:
+    confidence = max(0.0, 1.0 - (distance / max(threshold, 1e-6)))
+    return min(confidence, 1.0)
 
 class VisionNode:
     def __init__(self, broker, port, target_name):
@@ -57,20 +75,29 @@ class VisionNode:
         self.system = FaceLockSystem(target_name, self.matcher, self.det)
         
         self.running = True
-        self.last_heartbeat = 0
         self.last_publish_time = 0
-        self.mqtt_topic = TOPIC_MOVEMENT
+        self.mqtt_topic = TOPIC_CONTROL
         self.snapshot_sent = False  # Track if we've sent the face snapshot
+        self.track_threshold = self.matcher.dist_thresh
+        ensure_log_file()
 
     def on_connect(self, client, userdata, flags, rc):
         print(f"Connected to MQTT Broker with result code {rc}")
-        self.publish_heartbeat()
-
-    def publish_movement(self, status, confidence=1.0, target=None, locked=False, face_image=None):
+        
+    def publish_control(
+        self,
+        command,
+        confidence=0.0,
+        speaker_id="UNKNOWN",
+        face_distance=999.0,
+        locked=False,
+        face_image=None,
+    ):
         payload = {
-            "status": status,
+            "command": command,
+            "speaker_id": speaker_id,
             "confidence": confidence,
-            "target": target,
+            "face_distance": face_distance,
             "locked": locked,
             "timestamp": time.time()
         }
@@ -81,15 +108,22 @@ class VisionNode:
             payload["face_image"] = base64.b64encode(buffer).decode('utf-8')
         
         self.client.publish(self.mqtt_topic, json.dumps(payload))
-        print(f"Published: {status} (image: {'yes' if face_image is not None else 'no'})")
+        self.log_tracking(payload)
+        print(f"Published: {command} (image: {'yes' if face_image is not None else 'no'})")
 
-    def publish_heartbeat(self):
-        payload = {
-            "node": "pc_vision",
-            "status": "ONLINE",
-            "timestamp": time.time()
-        }
-        self.client.publish(TOPIC_HEARTBEAT, json.dumps(payload))
+    def log_tracking(self, payload):
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(payload["timestamp"]))
+        with open(LOG_PATH, "a", newline="", encoding="utf-8") as f:
+            writer = csv.writer(f)
+            writer.writerow(
+                [
+                    timestamp,
+                    payload["speaker_id"],
+                    round(float(payload["confidence"]), 4),
+                    round(float(payload["face_distance"]), 4),
+                    payload["command"],
+                ]
+            )
 
     def run(self):
         cap = cv2.VideoCapture(1) # Use default camera
@@ -97,7 +131,7 @@ class VisionNode:
              cap = cv2.VideoCapture(1)
         
         print(f"Vision Node Started. Tracking target: {self.system.target_name}")
-        print(f"Publishing to {TOPIC_MOVEMENT}")
+        print(f"Publishing to {TOPIC_CONTROL}")
         
         while self.running:
             ret, frame = cap.read()
@@ -109,14 +143,20 @@ class VisionNode:
             
             # Process Frame using FaceLockSystem
             # Note: process_frame now returns (vis_frame, target_face_obj)
-            vis, target_face = self.system.process_frame(frame, self.embedder)
+            vis, target_match = self.system.process_frame(frame, self.embedder)
             
-            status = "NO_FACE"
+            command = "SCAN"
             face_crop = None
+            face_distance = 999.0
+            confidence = 0.0
+            speaker_id = "UNKNOWN"
             
-            if target_face:
+            if target_match:
                 # Target is found and locked
-                f = target_face
+                f = target_match.face
+                face_distance = target_match.distance
+                confidence = distance_to_confidence(face_distance, self.track_threshold)
+                speaker_id = self.system.target_name
                 
                 # Extract face crop for dashboard (only if not sent yet)
                 if not self.snapshot_sent:
@@ -135,31 +175,35 @@ class VisionNode:
                 cx = (f.x1 + f.x2) / 2.0
                 cx_norm = cx / W
                 
-                # Movement Logic
-                # Deadband: 0.4 to 0.6 is CENTERED
+                # Movement logic with a centered deadband mapped to STOP
                 if cx_norm < 0.4:
-                    status = "MOVE_LEFT"
+                    command = "LEFT"
                 elif cx_norm > 0.6:
-                    status = "MOVE_RIGHT"
+                    command = "RIGHT"
                 else:
-                    status = "CENTERED"
+                    command = "STOP"
             else:
                 # No face detected - reset snapshot flag
                 if self.snapshot_sent:
                     self.snapshot_sent = False
                     print("🔓 Target lost - snapshot flag reset")
+
+                if self.system.lost_frames > self.system.MAX_LOST_FRAMES:
+                    command = "OUT_OF_FRAME"
             
             # --- RATE LIMITING (10Hz) ---
             current_time = time.time()
             if current_time - self.last_publish_time >= 0.1:
-                is_locked = (status != "NO_FACE")
-                self.publish_movement(status, target=self.system.target_name, locked=is_locked, face_image=face_crop)
+                is_locked = target_match is not None
+                self.publish_control(
+                    command,
+                    confidence=confidence,
+                    speaker_id=speaker_id,
+                    face_distance=face_distance,
+                    locked=is_locked,
+                    face_image=face_crop,
+                )
                 self.last_publish_time = current_time
-            
-            # Heartbeat every 5s
-            if time.time() - self.last_heartbeat > 5:
-                self.publish_heartbeat()
-                self.last_heartbeat = time.time()
             
             cv2.imshow("Vision Node (Locked)", vis)
             if cv2.waitKey(1) & 0xFF == ord('q'):

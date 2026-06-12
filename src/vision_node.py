@@ -10,7 +10,6 @@ import argparse
 import cv2
 import json
 import csv
-import numpy as np
 import paho.mqtt.client as mqtt
 from pathlib import Path
 import sys
@@ -22,16 +21,9 @@ if str(ROOT) not in sys.path:
     sys.path.append(str(ROOT))
 
 # Import Face Locking modules
-try:
-    from src.camera_utils import open_camera
-    from src.haar_5pt import Haar5ptDetector
-    from src.recognize import ArcFaceEmbedderONNX, FaceDBMatcher, load_db_npz
-    from src.face_locking import FaceLockSystem
-except ImportError:
-    from camera_utils import open_camera
-    from haar_5pt import Haar5ptDetector
-    from recognize import ArcFaceEmbedderONNX, FaceDBMatcher, load_db_npz
-    from face_locking import FaceLockSystem
+from src.haar_5pt import Haar5ptDetector
+from src.recognize import ArcFaceEmbedderONNX, FaceDBMatcher, load_db_npz
+from src.face_locking import FaceLockSystem
 
 # Configuration
 DEFAULT_BROKER = "[IP_ADDRESS]" 
@@ -136,9 +128,10 @@ class VisionNode:
             )
 
     def run(self):
-        cap = cv2.VideoCapture(0) # Use default camera
+        camera_index = self.camera_index if self.camera_index is not None else 0
+        cap = cv2.VideoCapture(camera_index) # Use default camera
         if not cap.isOpened():
-             cap = cv2.VideoCapture(0)
+            cap = cv2.VideoCapture(camera_index)
         
         print(f"Vision Node Started. Tracking target: {self.system.target_name}")
         print(f"Using camera index: {camera_index}")
@@ -146,7 +139,8 @@ class VisionNode:
         
         while self.running:
             ret, frame = cap.read()
-            if not ret: break
+            if not ret:
+                break
             
             # Flip for mirror effect
             frame = cv2.flip(frame, 1)

@@ -261,9 +261,7 @@ class Haar5ptDetector:
 
     def detect(self, frame_bgr: np.ndarray, max_faces: int = 1) -> List[FaceKpsBox]:
         H, W = frame_bgr.shape[:2]
-        gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
-
-        faces = self._haar_faces(gray)
+        faces = self._haar_faces(cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY))
         if faces.shape[0] == 0:
             return []
 
@@ -331,7 +329,6 @@ class Haar5ptDetector:
         Haar validation is disabled to ensure robust multi-face detection even if Haar fails.
         """
         H, W = frame_bgr.shape[:2]
-        gray = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
 
         # haar_faces = self._haar_faces(gray)
         # if haar_faces.shape[0] == 0:
@@ -353,8 +350,10 @@ class Haar5ptDetector:
             pts = [[lm[j].x * W, lm[j].y * H] for j in idxs]
             kps = np.array(pts, dtype=np.float32)
             
-            if kps[0, 0] > kps[1, 0]: kps[[0, 1]] = kps[[1, 0]]
-            if kps[3, 0] > kps[4, 0]: kps[[3, 4]] = kps[[4, 3]]
+            if kps[0, 0] > kps[1, 0]:
+                kps[[0, 1]] = kps[[1, 0]]
+            if kps[3, 0] > kps[4, 0]:
+                kps[[3, 4]] = kps[[4, 3]]
             
             # Check consistency with ANY Haar box
             # matched = False

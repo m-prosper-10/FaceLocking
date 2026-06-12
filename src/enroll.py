@@ -24,6 +24,7 @@ Controls:
 from __future__ import annotations
 import json
 import time
+import argparse
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -168,17 +169,28 @@ def draw_status(
 # Main
 # -------------------------
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--name", type=str, help="Person name to enroll")
+    args = parser.parse_args()
+
     cfg = EnrollConfig()
     ensure_dirs(cfg)
 
-    name = input("Enter person name to enroll (e.g., Alice): ").strip()
+    name = (args.name or input("Enter person name to enroll (e.g., Alice): ")).strip()
     if not name:
         print("No name provided. Exiting.")
         return
 
+    model_path = Path("models/embedder_arcface.onnx")
+    if not model_path.exists():
+        raise FileNotFoundError(
+            f"ArcFace ONNX model not found: {model_path}. "
+            "Place the model there before running enrollment."
+        )
+
     det = Haar5ptDetector(min_size=(70, 70), smooth_alpha=0.80, debug=False)
     emb = ArcFaceEmbedderONNX(
-        model_path="models/embedder_arcface.onnx",
+        model_path=str(model_path),
         input_size=(112, 112),
         debug=False,
     )

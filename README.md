@@ -27,12 +27,63 @@ The system is designed for **embedded systems applications**, demonstrating how 
 
 ## System Architecture
 
-This distributed system consists of four main components:
+This system uses a distributed, message-driven architecture:
 
-1. **Vision Node (PC)**: Detects, recognizes, and tracks faces using ArcFace and MediaPipe. Publishes movement commands via MQTT.
-2. **MQTT Broker (VPS)**: Central message broker facilitating communication between all components.
-3. **ESP8266 (Edge Controller)**: Subscribes to movement commands and controls a servo motor to physically track the detected face.
-4. **Web Dashboard**: Real-time visualization of system status, tracking data, and lock status.
+```mermaid
+flowchart LR
+    CAM[USB Camera]
+    VISION[PC Vision Node\nsrc/vision_node.py]
+    MQTT[(MQTT Broker\nMosquitto)]
+    BACKEND[Node Backend\nbackend/server.js]
+    DASH[Web Dashboard\ndashboard/index.html]
+    ESP[ESP8266 Servo Controller\nvision_servo.ino]
+    DB[(Face DB\nface_db.npz)]
+
+    CAM --> VISION
+    DB --> VISION
+    VISION -->|vision/team313/movement| MQTT
+    VISION -->|vision/team313/heartbeat| MQTT
+    MQTT --> BACKEND
+    BACKEND -->|WebSocket relay| DASH
+    MQTT --> ESP
+```
+
+### Components
+
+1. **PC Vision Node**
+   - Captures camera frames.
+   - Detects faces, aligns them, and matches identities with ArcFace embeddings.
+   - Decides whether the target is moving left, right, centered, or absent.
+   - Publishes MQTT messages for movement and heartbeat.
+
+2. **MQTT Broker**
+   - Central transport layer for all runtime communication.
+   - Carries movement commands from the vision node to the ESP8266.
+   - Carries status events such as heartbeat messages.
+
+3. **Node Backend**
+   - Subscribes to MQTT movement messages.
+   - Relays them to browser clients over WebSocket.
+   - Serves the dashboard HTML.
+
+4. **Web Dashboard**
+   - Displays current tracking status, lock state, and face snapshot.
+   - Connects to the backend over WebSocket.
+
+5. **ESP8266 Servo Controller**
+   - Subscribes to movement commands from MQTT.
+   - Drives the servo motor to follow the detected target.
+   - Switches into search mode when the target is lost.
+
+### Runtime Data Flow
+
+1. The camera frame is read by the PC vision node.
+2. The face is detected and aligned.
+3. The identity is matched against the enrollment database.
+4. The vision node publishes movement commands to MQTT.
+5. The ESP8266 receives those commands and moves the servo.
+6. The backend forwards the same movement events to the dashboard.
+7. The dashboard renders the live state for monitoring.
 
 ## Features
 

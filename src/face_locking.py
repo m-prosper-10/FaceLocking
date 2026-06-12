@@ -7,20 +7,19 @@ import cv2
 import numpy as np
 from pathlib import Path
 from dataclasses import dataclass
-from typing import List, Optional, Tuple, Dict
+from typing import List, Optional, Tuple
 from enum import Enum
-import mediapipe as mp
 
 # Import existing modules
 # We need to ensure we can import from . if run as a module or direct
 try:
-    from .haar_5pt import Haar5ptDetector, align_face_5pt, _bbox_from_5pt, _clip_box_xyxy
+    from .haar_5pt import Haar5ptDetector, align_face_5pt
     from .recognize import ArcFaceEmbedderONNX, FaceDBMatcher, load_db_npz
 except ImportError:
     # If run directly: python src/face_locking.py
     import sys
     sys.path.append(str(Path(__file__).parent.parent))
-    from src.haar_5pt import Haar5ptDetector, align_face_5pt, _bbox_from_5pt, _clip_box_xyxy
+    from src.haar_5pt import Haar5ptDetector, align_face_5pt
     from src.recognize import ArcFaceEmbedderONNX, FaceDBMatcher, load_db_npz
 
 # ---------------------------------------------------------
@@ -340,7 +339,8 @@ def main():
     
     while True:
         ok, frame = cap.read()
-        if not ok: break
+        if not ok:
+            break
         
         # Mirror the frame (user requested to "remove" the flip, implying they want the opposite of current)
         frame = cv2.flip(frame, 1)

@@ -10,6 +10,7 @@ const char* mqtt_server = "157.173.101.159";
 const int mqtt_port = 1883;
 const char* client_id = "esp8266_team313";
 const char* topic_movement = "benax/camera/control";
+const char* topic_heartbeat = "benax/camera/heartbeat";
 
 // Servo Configuration
 Servo myServo;
@@ -94,27 +95,25 @@ void callback(char* topic, byte* payload, unsigned int length) {
   }
   
   // Parse the commands and update the Watchdog Timer
-  if (message.indexOf("MOVE_LEFT") >= 0) {
+  if (message.indexOf("LEFT") >= 0 || message.indexOf("MOVE_LEFT") >= 0) {
     setSearchMode(false);
     lastFaceDetectTime = millis(); // Reset the timer!
     moveServo(-3);       
   } 
-  else if (message.indexOf("MOVE_RIGHT") >= 0) {
+  else if (message.indexOf("RIGHT") >= 0 || message.indexOf("MOVE_RIGHT") >= 0) {
     setSearchMode(false);
     lastFaceDetectTime = millis(); // Reset the timer!
     moveServo(3);        
   } 
-  else if (message.indexOf("CENTERED") >= 0) {
+  else if (message.indexOf("STOP") >= 0 || message.indexOf("CENTERED") >= 0) {
     setSearchMode(false);
     lastFaceDetectTime = millis(); // Reset the timer!
   } 
-  else if (message.indexOf("NO_FACE") >= 0) {
+  else if (message.indexOf("NO_FACE") >= 0 || message.indexOf("SCAN") >= 0) {
     setSearchMode(true);  // Explicit command to start searching
   }
   else if (message.indexOf("OUT_OF_FRAME") >= 0) {
-    isSearching = false;
-    currentAngle = 90;
-    myServo.write(currentAngle);
+    setSearchMode(true);
   }
 }
 

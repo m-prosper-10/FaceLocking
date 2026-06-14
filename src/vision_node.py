@@ -81,6 +81,23 @@ class VisionNode:
         self.snapshot_sent = False  # Track if we've sent the face snapshot
         self.track_threshold = self.matcher.dist_thresh
         self.camera_index = camera_index
+        self.filtered_cx = None
+        self.motion_state = "STOP"
+        self.last_tracking_publish = 0.0
+        self.no_face_frames = 0
+        self.search_announced = False
+        self.last_sent_command = None
+        self.LABEL_LEFT = "LEFT"
+        self.LABEL_RIGHT = "RIGHT"
+        self.LABEL_STOP = "STOP"
+        self.LABEL_SCAN = "SCAN"
+        self.CENTER_LOW = 0.42
+        self.CENTER_HIGH = 0.58
+        self.LEFT_RELEASE = 0.48
+        self.RIGHT_RELEASE = 0.52
+        self.TRACK_PUBLISH_INTERVAL = 0.22
+        self.STOP_PUBLISH_INTERVAL = 0.8
+        self.NO_FACE_TRIGGER_FRAMES = 8
         ensure_log_file()
 
     def on_connect(self, client, userdata, flags, rc):
@@ -127,6 +144,50 @@ class VisionNode:
                 ]
             )
 
+    def decide_motion_command(self, cx_norm: float) -> str:
+        """
+        Apply low-pass smoothing and hysteresis so small face jitter does not
+        flip the servo direction on adjacent frames.
+        """
+        alpha = 0.25
+        if self.filtered_cx is None:
+            self.filtered_cx = cx_norm
+        else:
+            self.filtered_cx = (1.0 - alpha) * self.filtered_cx + alpha * cx_norm
+
+        cx = self.filtered_cx
+
+        if self.motion_state == self.LABEL_LEFT:
+            if cx > self.LEFT_RELEASE:
+                return self.LABEL_STOP
+            return self.LABEL_LEFT
+
+        if self.motion_state == self.LABEL_RIGHT:
+            if cx < self.RIGHT_RELEASE:
+                return self.LABEL_STOP
+            return self.LABEL_RIGHT
+
+        if cx < self.CENTER_LOW:
+            return self.LABEL_LEFT
+        if cx > self.CENTER_HIGH:
+            return self.LABEL_RIGHT
+        return self.LABEL_STOP
+
+    def should_publish_command(self, command: str, current_time: float) -> bool:
+        if command == self.LABEL_SCAN:
+            return not self.search_announced
+
+        if command != self.motion_state:
+            return True
+
+        if command in (self.LABEL_LEFT, self.LABEL_RIGHT):
+            return (current_time - self.last_tracking_publish) >= self.TRACK_PUBLISH_INTERVAL
+
+        if command == self.LABEL_STOP:
+            return (current_time - self.last_tracking_publish) >= self.STOP_PUBLISH_INTERVAL
+
+        return False
+
     def run(self):
         camera_index = self.camera_index if self.camera_index is not None else 0
         cap = cv2.VideoCapture(camera_index) # Use default camera
@@ -150,7 +211,7 @@ class VisionNode:
             # Note: process_frame now returns (vis_frame, target_face_obj)
             vis, target_match = self.system.process_frame(frame, self.embedder)
             
-            command = "SCAN"
+            command = self.LABEL_STOP
             face_crop = None
             face_distance = 999.0
             confidence = 0.0
@@ -162,6 +223,8 @@ class VisionNode:
                 face_distance = target_match.distance
                 confidence = distance_to_confidence(face_distance, self.track_threshold)
                 speaker_id = self.system.target_name
+                self.no_face_frames = 0
+                self.search_announced = False
                 
                 # Extract face crop for dashboard (only if not sent yet)
                 if not self.snapshot_sent:
@@ -179,26 +242,31 @@ class VisionNode:
                 # Calculate Center
                 cx = (f.x1 + f.x2) / 2.0
                 cx_norm = cx / W
-                
-                # Movement logic with a centered deadband mapped to STOP
-                if cx_norm < 0.4:
-                    command = "LEFT"
-                elif cx_norm > 0.6:
-                    command = "RIGHT"
-                else:
-                    command = "STOP"
+
+                command = self.decide_motion_command(cx_norm)
             else:
                 # No face detected - reset snapshot flag
+                self.no_face_frames += 1
                 if self.snapshot_sent:
                     self.snapshot_sent = False
                     print("🔓 Target lost - snapshot flag reset")
 
-                if self.system.lost_frames > self.system.MAX_LOST_FRAMES:
-                    command = "OUT_OF_FRAME"
+                if self.no_face_frames >= self.NO_FACE_TRIGGER_FRAMES:
+                    command = self.LABEL_SCAN
+                    self.motion_state = self.LABEL_STOP
             
             # --- RATE LIMITING (10Hz) ---
             current_time = time.time()
-            if current_time - self.last_publish_time >= 0.1:
+            publish = False
+            if command != self.last_sent_command:
+                publish = True
+            elif self.should_publish_command(command, current_time):
+                if command == self.LABEL_SCAN:
+                    publish = True
+                elif current_time - self.last_publish_time >= 0.1:
+                    publish = True
+
+            if publish:
                 is_locked = target_match is not None
                 self.publish_control(
                     command,
@@ -209,6 +277,12 @@ class VisionNode:
                     face_image=face_crop,
                 )
                 self.last_publish_time = current_time
+                self.last_sent_command = command
+                if command == self.LABEL_SCAN:
+                    self.search_announced = True
+                else:
+                    self.motion_state = command
+                    self.last_tracking_publish = current_time
             
             cv2.imshow("Vision Node (Locked)", vis)
             if cv2.waitKey(1) & 0xFF == ord('q'):

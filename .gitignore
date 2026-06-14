@@ -9,3 +9,8 @@ node_modules/
 *.pdf
 dp.txt
 __pycache__
+*.txt
+*.jpg
+*.log
+targets
+*.csv
